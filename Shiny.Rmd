@@ -1,0 +1,15 @@
+---
+title: "Shiny_app2"
+author: "R. Westerweele"
+date: "10-8-2020"
+output: html_document
+runtime: shiny
+---
+
+```{r}
+library(shiny)
+
+textInput("name", "What is your name?")
+numericInput("age", "How old are you?", NA, min = 1, max = 130)
+```
+

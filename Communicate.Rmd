@@ -1,0 +1,569 @@
+---
+title: "Communicate tutorial"
+date: 2020-08-07
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+params:
+  my_class: "suv"
+  start: !r lubridate::ymd("2015-01-01")
+  snapshot: !r lubridate::ymd_hms("2015-01-01 12:30:00")
+---
+
+```{r knitr_opts, include = FALSE}
+#knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r render, echo=FALSE}
+#rmarkdown::render("Communicate.Rmd")
+``` 
+
+
+```{r setup, include = FALSE}
+library(ggplot2)
+library(dplyr)
+
+smaller <- diamonds %>% 
+  filter(carat <= 2.5)
+```
+
+*We have data about `r nrow(diamonds)` diamonds. Only `r nrow(diamonds) - nrow(smaller)` are larger than 2.5 carats. The distribution of the remainder is shown below:*
+
+```{r Freq-poly, echo=FALSE}
+smaller %>% 
+  ggplot(aes(carat)) +
+  geom_freqpoly(binwidth = .01)
+```
+**bold**
+
+superscript^2^ and subscript ~2~
+
+The quick brown fox jumped over the lazy dog.[^quick-fox]
+
+Use three or more `-` for a horizontal rule. For example,
+
+---
+
+The horizontal rule uses the same syntax as a YAML block? So how does R markdown
+distinguish between the two?  Three dashes ("---") is only treated the start of
+a YAML block if it is at the start of the document.
+
+> This would be a block quote. Generally, block quotes are used to indicate
+> quotes longer than a three or four lines.
+
+[^quick-fox]: This is an example of a footnote. The sentence this is footnoting
+  is often used for displaying fonts because it includes all 26 letters of the
+  English alphabet.
+  
+```{r function, include = FALSE, purl = FALSE}
+# Hide objects and functions ONLY used inline
+n_larger <- nrow(diamonds) - nrow(smaller)
+pct_larger <- n_larger / nrow(diamonds) * 100
+
+comma <- function(x) {
+  format(x, digits = 2, big.mark = ",")
+}
+```
+
+## Size and Cut, Color, and Clarity
+
+Diamonds with lower quality cuts (cuts are ranked from "Ideal" to "Fair") tend 
+to be be larger.
+```{r box plots}
+ggplot(diamonds, aes(y = carat, x = cut)) +
+  geom_boxplot()
+```
+Likewise, diamonds with worse color (diamond colors are ranked from J (worst)
+to D (best)) tend to be larger:
+
+```{r box plots 2}
+ggplot(diamonds, aes(y = carat, x = color)) +
+  geom_boxplot()
+```
+
+The pattern present in cut and color is also present in clarity. Diamonds with 
+worse clarity  (I1 (worst), SI1, SI2, VS1, VS2, VVS1, VVS2, IF (best)) tend to
+be larger:
+
+```{r box plots 3}
+ggplot(diamonds, aes(y = carat, x = clarity)) +
+  geom_boxplot()
+```
+
+[Berkson's paradox](https://en.wikipedia.org/wiki/Berkson%27s_paradox).
+
+## Largest Diamonds
+
+We have data about `r comma(nrow(diamonds))` diamonds. Only
+`r n_larger` (`r round(pct_larger, 1)`%) are larger
+than 2.5 carats. The distribution of the remainder is shown below:
+
+```{r freqpoly 2}
+smaller %>%
+  ggplot(aes(carat)) +
+  geom_freqpoly(binwidth = 0.01)
+```
+
+The frequency distribution of diamond sizes is marked by spikes at
+whole-number and half-carat values, as well as several other carat values corresponding to fractions.
+
+The largest twenty diamonds (by carat) in the datasets are,
+
+```{r asis description, results = "asis"}
+diamonds %>%
+  arrange(desc(carat)) %>%
+  slice(1:20) %>%
+  select(carat, cut, color, clarity) %>%
+  knitr::kable(
+    caption = "The largest 20 diamonds in the `diamonds` dataset."
+  )
+```
+
+Most of the twenty largest datasets are in the lowest clarity category ("I1"),with one being in the second best category ("VVS2") The top twenty diamonds have colors ranging from the worst, "J", to best, "D",categories, though mostare in the lower categories "J" and "I". The top twenty diamonds are more evenlydistributed among the cut categories, from "Fair" to "Ideal", although the worst
+category (Fair) is the most common.
+
+```{r diff_settings, eval = FALSE, include = FALSE, echo = FALSE, message = FALSE, results = 'hide', fig.show = 'hide', error=TRUE}
+```
+
+```{r tables}
+knitr::kable(
+  mtcars[1:5, ],
+  caption = 'A knitr kable'
+)
+```
+```{r raw_data}
+#rawdata <- readr::read_csv("large_csv.csv")
+```
+
+```{r processed_data, cache = TRUE}
+#processed_data <- rawdata %>% filter(!is.na(import_var)) %>% mutate(new_var = map2(x, y, z))
+```
+
+```{r processed_data2, cache=TRUE, dependson="raw_data"}
+#processed_data <- rawdata %>% filter(!is.na(import_var)) %>% mutate(new_var = map2(x, y, z))
+```
+
+```{r raw_data2, cache.extra = file.info("large_csv.csv")}
+#rawdata <- readr::read_csv("large_csv.csv")
+#knitr::clean_cache()
+```
+
+```{r change_comma_fun}
+comma <- function(x) {
+  format(x, digits = 2, big.mark = ".", decimal.mark = ",")
+}
+
+comma(123456.89)
+comma(.89)
+```
+The chunk `a` has no dependencies.
+```{r a}
+print(lubridate::now())
+x <- 1
+```
+
+The chunk `b` depends on `a`.
+```{r b, dependson = c("a")}
+print(lubridate::now())
+y <- x + 1
+```
+
+The chunk `c` depends on `a`.
+```{r c, dependson = c("a")}
+print(lubridate::now())
+z <- x * 2
+```
+
+The chunk `d` depends on `c` and `b`:
+```{r d, dependson = c("c", "b")}
+print(lubridate::now())
+w <- y + z
+```
+
+If this document is knit repeatedly, the value  printed by `lubridate::now()` will be the same for all chunks, and the same as the first time the document
+was run with caching.
+
+```{r param_test, message = FALSE}
+class <-  mpg %>% filter(class == params$my_class)
+
+ggplot(class, aes(displ, hwy)) +
+  geom_point() + 
+  geom_smooth(se = FALSE)
+```
+
+```{r inline / console}
+#rmarkdown::render("fuel-economy.Rmd", params = list(my_class = "suv"))
+```
+
+```{r pwalk}
+reports <-  tibble(
+  class = unique(mpg$class),
+  filename = stringr::str_c("fuel_economy_", class, ".html"),
+  params = purrr::map(class, ~ list(my_class = .))
+)
+reports
+
+reports %>% 
+  select(output_file = filename, params) %>% 
+  purrr::pwalk(rmarkdown::render, input = "Communicate.Rmd")
+```
+
+```{r graphics, message = FALSE}
+library(tidyverse)
+library("modelr")
+library("lubridate")
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(color = class)) +
+  geom_smooth(se = FALSE) +
+  labs(
+    x = "Engine displacement in liters",
+    y = "Highway fuel economy (mpg)",
+    colour = "Car type",
+    title = "Fuel efficiency generally decreases with engine size",
+    subtitle = "Two seaters are an exception (sport cars), because of low weight",
+    caption = "Data from fueleconomy.gov"
+    )
+
+df <- tibble(
+  x = runif(10),
+  y = runif(10)
+)
+
+
+ggplot(df, aes(x, y)) +
+  geom_point() +
+  labs(
+    x = quote(sum(x[i] ^ 2, i == 1, n)),
+    y = quote(alpha + beta + frac(delta, theta))
+  )
+
+ggplot(
+  data = mpg,
+  mapping = aes(x = fct_reorder(class, hwy), y = hwy)
+) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    title = "Compact Cars have > 10 Hwy MPG than Pickup Trucks",
+    subtitle = "Comparing the median highway mpg in each class",
+    caption = "Data from fueleconomy.gov",
+    x = "Car Class",
+    y = "Highway Miles per Gallon"
+  )
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Fuel Efficiency Decreases with Engine Size",
+    caption = "Data from fueleconomy.gov",
+    y = "Highway Miles per Gallon",
+    x = "Engine Displacement"
+  )
+
+ggplot(mpg, aes(displ, hwy, colour = class)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Fuel Efficiency Mostly Varies by Car Class",
+    subtitle = "Subcompact caries fuel efficiency varies by engine size",
+    caption = "Data from fueleconomy.gov",
+    y = "Highway Miles per Gallon",
+    x = "Engine Displacement"
+  )
+
+mod <- lm(hwy ~ class, data = mpg)
+mpg %>%
+  add_residuals(mod) %>%
+  ggplot(aes(x = displ, y = resid)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Engine size has little effect on fuel efficiency",
+    subtitle = "After accounting for car class",
+    caption = "Data from fueleconomy.gov",
+    y = "Highway MPG Relative to Class Average",
+    x = "Engine Displacement"
+  )
+
+best_in_class <- mpg %>% 
+  group_by(class) %>% 
+  filter(row_number(desc(hwy)) == 1)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(colour = class)) +
+  geom_text(aes(label = model), data = best_in_class)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(colour = class)) +
+  geom_label(aes(label = model), data = best_in_class, nudge_y = 2, alpha = .5)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(colour = class)) +
+  geom_point(size = 3, shape = 1, data = best_in_class) +
+  ggrepel::geom_label_repel(aes(label = model), data = best_in_class)
+
+class_avg <-  mpg %>% 
+  group_by(class) %>% 
+  summarise(
+    displ = median(displ),
+    hwy = median(hwy)
+  )
+
+ggplot(mpg, aes(displ, hwy, colour = class)) +
+  ggrepel::geom_label_repel(aes(label = class),
+                            data = class_avg,
+                            size = 6,
+                            label.size = 0,
+                            segment.color = NA) +
+  geom_point() +
+  theme(legend.position = "none")
+
+label <- mpg %>% 
+  summarise(
+    displ = max(displ),
+    hwy = max(hwy),
+    label = "Increasing engine size is \nreleated to decreasing fuel economy"
+  )
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_text(aes(label = label), data = label, vjust = "top", hjust = "right")
+
+label <- tibble(
+  displ = Inf,
+  hwy = Inf,
+  label = "Increasing etc..."
+)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_text(aes(label = label), data = label, vjust = "top", hjust = "right")
+
+"increasing enginze size is related to decreasing fuel economy." %>% stringr::str_wrap(width = 35) %>% 
+  writeLines()
+
+#geom_rect(aes(xmin, xmax, ymin, ymax))
+#geom_segment(arrow, aes(x, y, xend, y, end))
+
+label <- tribble(
+  ~displ, ~hwy, ~label, ~vjust, ~hjust,
+  Inf, Inf, "Top right", "top", "right",
+  Inf, -Inf, "Bottom right", "bottom", "right",
+  -Inf, Inf, "Top left", "top", "left",
+  -Inf, -Inf, "Bottom left", "bottom", "left"
+)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_text(aes(label = label, vjust = vjust, hjust = hjust), data = label)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  annotate("text",
+    x = Inf, y = Inf,
+    label = "Increasing engine size is \nrelated to decreasing fuel economy.", vjust = "top", hjust = "right"
+  )
+
+label <- tibble(
+  displ = Inf,
+  hwy = Inf,
+  label = "Increasing engine size is \nrelated to decreasing fuel economy."
+)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_text(aes(label = label),
+    data = label, vjust = "top", hjust = "right",
+    size = 2
+  ) +
+  facet_wrap(~class)
+
+label <- tibble(
+  displ = Inf,
+  hwy = Inf,
+  class = "2seater",
+  label = "Increasing engine size is \nrelated to decreasing fuel economy."
+)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_text(aes(label = label),
+    data = label, vjust = "top", hjust = "right",
+    size = 2
+  ) +
+  facet_wrap(~class)
+
+label <- tibble(
+  displ = Inf,
+  hwy = Inf,
+  class = unique(mpg$class),
+  label = str_c("Label for ", class)
+)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_text(aes(label = label),
+    data = label, vjust = "top", hjust = "right",
+    size = 3
+  ) +
+  facet_wrap(~class)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(colour = class)) +
+  scale_y_continuous(breaks = seq(15,45, by = 4)) +
+  scale_x_continuous(labels = NULL)
+
+presidential %>% 
+  mutate(id = 33 + row_number()) %>% 
+  ggplot(aes(start, id)) +
+  geom_point() +
+  geom_segment(aes(xend = end, yend = id)) +
+  scale_x_date(NULL, breaks = presidential$start, date_labels = "'%y", limits = c(min(presidential$start)-2500, max(presidential$end))) +
+  geom_label(aes(label = presidential$name, colour = presidential$name), nudge_y = .8, nudge_x = -1100) +
+  theme(legend.position = "none")
+
+base <-  ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(colour = class))
+
+base + theme(legend.position = "left")
+base + theme(legend.position = "bottom")
+#etc
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(colour = class)) +
+  geom_smooth(se = FALSE) +
+  theme(legend.position = "top") +
+  guides(colour = guide_legend(nrow = 1, override.aes = list(size = 4)))
+
+ggplot(diamonds, aes(carat, price)) +
+  geom_bin2d() +
+  scale_x_log10() +
+  scale_y_log10()
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(color = drv, shape = drv)) +
+  scale_colour_brewer(palette = "Set1")
+
+presidential %>% 
+  mutate(id = 33 + row_number()) %>% 
+  ggplot(aes(start, id, colour = party)) +
+  geom_point() +
+  geom_segment(aes(xend = end, yend = id)) +
+  scale_colour_manual(values = c(Republican = "red", Democratic = "blue"))
+
+df <- tibble(
+  x = rnorm(10000),
+  y = rnorm(10000)
+)
+
+ggplot(df, aes(x, y)) +
+  geom_hex() +
+  coord_fixed()
+
+ggplot(df, aes(x, y)) +
+  geom_hex() +
+  viridis::scale_fill_viridis() +
+  coord_fixed()
+
+#scale_colour_x()
+#scale_fill_x()
+
+ggplot(df, aes(x, y)) +
+  geom_hex() +
+  scale_colour_gradient(low = "white", high = "red") +
+  coord_fixed()
+
+ggplot(df, aes(x, y)) +
+  geom_hex() +
+  scale_fill_gradient(low = "white", high = "red") +
+  coord_fixed()
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(colour = class)) +
+  geom_smooth(se = FALSE) +
+  labs(
+    x = "Engine displacement (L)",
+    y = "Highway fuel economy (mpg)",
+    colour = "Car type"
+  )
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(colour = class)) +
+  geom_smooth(se = FALSE) +
+  scale_x_continuous("Engine displacement (L)") +
+  scale_y_continuous("Highway fuel economy (mpg)") +
+  scale_colour_discrete("Car type")
+
+fouryears <- lubridate::make_date(seq(year(min(presidential$start)),
+  year(max(presidential$end)),
+  by = 4
+), 1, 1)
+
+presidential %>%
+  mutate(
+    id = 33 + row_number(),
+    name_id = fct_inorder(str_c(name, " (", id, ")"))
+  ) %>%
+  ggplot(aes(start, name_id, colour = party)) +
+  geom_point() +
+  geom_segment(aes(xend = end, yend = name_id)) +
+  scale_colour_manual("Party", values = c(Republican = "red", Democratic = "blue")) +
+  scale_y_discrete(NULL) +
+  scale_x_date(NULL,
+    breaks = presidential$start, date_labels = "'%y",
+    minor_breaks = fouryears
+  ) +
+  ggtitle("Terms of US Presdients",
+    subtitle = "Roosevelth (34th) to Obama (44th)"
+  ) +
+  theme(
+    panel.grid.minor = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+ggplot(diamonds, aes(carat, price)) +
+  geom_point(aes(colour = cut), alpha = 1 / 20)
+
+ggplot(diamonds, aes(carat, price)) +
+  geom_point(aes(colour = cut), alpha = 1 / 20) +
+  theme(legend.position = "bottom") +
+  guides(colour = guide_legend(nrow = 1, override.aes = list(alpha = 1)))
+
+x_scale <- scale_x_continuous(limits = range(mpg$displ))
+y_scale <- scale_y_continuous(limits = range(mpg$hwy))
+col_scale <- scale_colour_discrete(limits = unique(mpg$drv))
+
+suv <- mpg %>% filter(class == "suv")
+compact <- mpg %>%  filter(class == "compact")
+
+ggplot(suv, aes(displ, hwy, colour = drv)) +
+  geom_point() +
+  x_scale +
+  y_scale +
+  col_scale
+
+ggplot(compact, aes(displ, hwy, colour = drv)) +
+  geom_point() +
+  x_scale +
+  y_scale +
+  col_scale +
+  geom_smooth(se = FALSE) +
+  theme_bw()
+
+#ggsave("my-plot.pdf", width = 1, height = 1)
+
+```
+
+```{r}
+#knitr::opts_chunck$set(echo = FALSE), turn of all code
+
+library(leaflet)
+leaflet() %>% 
+  setView(174.764, -36.877, zoom = 16) %>% 
+  addTiles() %>% 
+  addMarkers(174.764, -36.877, popup = "Maungawhau")
+```
+

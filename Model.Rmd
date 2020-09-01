@@ -1,0 +1,1117 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+```{r}
+library(tidyverse)
+
+library(modelr)
+options(na.action = na.warn)
+```
+
+```{r}
+ggplot(sim1, aes(x, y)) +
+  geom_point()
+
+models <-  tibble(
+  a1 = runif(250, -20, 40),
+  a2 = runif(250, -5, 5)
+)
+
+ggplot(sim1, aes(x, y)) +
+  geom_abline(aes(intercept = a1, slope = a2), data = models, aplpha = 1/4) +
+  geom_point()
+
+model1 <- function(a, data) {
+  a[1] + data$x * a[2]
+}
+
+model1(c(7, 1.5), sim1)
+
+measure_distance <- function(mod, data) {
+  diff <- data$y - model1(mod, data)
+  sqrt(mean(diff ^ 2))
+}
+
+measure_distance(c(7, 1.5), sim1)
+
+sim1_dist <- function(a1, a2) {
+  measure_distance(c(a1, a2), sim1)
+}
+
+models <- models %>% 
+  mutate(dist = purrr::map2_dbl(a1, a2, sim1_dist))
+
+
+ggplot(sim1, aes(x, y)) +
+  geom_point(size = 2, colour = "grey30") +
+  geom_abline(
+    aes(intercept = a1, slope = a2, colour = -dist),
+    data = filter(models, rank(dist) <= 10)
+  )
+
+ggplot(models, aes(a1, a2)) +
+  geom_point(data = filter(models, rank(dist) <= 10), size = 4, colour = "red") +
+  geom_point(aes(colour = -dist))
+
+grid <-  expand.grid(
+  a1 = seq(-5, 20, length = 25),
+  a2 = seq(1, 3, length = 25)
+) %>% 
+  mutate(dist = purrr::map2_dbl(a1, a2, sim1_dist))
+
+grid %>% 
+  ggplot(aes(a1, a2)) +
+  geom_point(data = filter(grid, rank(dist) <= 10), size = 4, colour = "red") +
+  geom_point(aes(colour = -dist))
+
+ggplot(sim1, aes(x, y)) +
+  geom_point(size = 2, colour = "grey30") +
+  geom_abline(
+    aes(intercept = a1, slope = a2, colour = -dist),
+    data = filter(grid, rank(dist) <= 10)
+  )
+
+best <- optim(c(0,0), measure_distance, data = sim1)
+best$par
+
+ggplot(sim1, aes(x, y)) +
+  geom_point(size = 2, colour = "grey30") +
+  geom_abline(intercept = best$par[1], slope = best$par[2])
+
+
+sim1_mod <- lm(y ~ x, data = sim1)
+coef(sim1_mod)
+
+sim1a <- tibble(
+  x = rep(1:10, each = 3),
+  y = x * 1.5 + 6 + rt(length(x), df = 2)
+)
+
+ggplot(sim1a, aes(x = x, y = y)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+simt <- function(i) {
+  tibble(
+    x = rep(1:10, each = 3),
+    y = x * 1.5 + 6 + rt(length(x), df = 2),
+    .id = i
+  )
+}
+
+sims <- map_df(1:12, simt)
+
+ggplot(sims, aes(x = x, y = y)) +
+  geom_point() +
+  geom_smooth(method = "lm", colour = "red") +
+  facet_wrap(~.id, ncol = 4)
+
+sim_norm <- function(i) {
+  tibble(
+    x = rep(1:10, each = 3),
+    y = x * 1.5 + 6 + rnorm(length(x)),
+    .id = i
+  )
+}
+
+simdf_norm <- map_df(1:12, sim_norm)
+
+ggplot(simdf_norm, aes(x = x, y = y)) +
+  geom_point() +
+  geom_smooth(method = "lm", colour = "red") +
+  facet_wrap(~.id, ncol = 4)
+
+tibble(
+  x = seq(-5, 5, length.out = 100),
+  normal = dnorm(x),
+  student_t = dt(x, df = 2)
+) %>%
+  pivot_longer(-x, names_to="distribution", values_to="density") %>%
+  ggplot(aes(x = x, y = density, colour = distribution)) +
+  geom_line()
+
+pnorm(2, lower.tail = FALSE)
+
+pt(2, df = 2, lower.tail = FALSE)
+
+measure_distance <- function(mod, data) {
+  diff <- data$y - make_prediction(mod, data)
+  mean(abs(diff))
+}
+
+make_prediction <- function(mod, data) {
+  mod[1] + mod[2] * data$x
+}
+
+best <- optim(c(0, 0), measure_distance, data = sim1a)
+best$par
+
+measure_distance_ls <- function(mod, data) {
+  diff <- data$y - (mod[1] + mod[2] * data$x)
+  sqrt(mean(diff^2))
+}
+
+best <- optim(c(0, 0), measure_distance_ls, data = sim1a)
+best$par
+
+model3 <- function(a, data) {
+  a[1] + data$x * a[2] + a[3]
+}
+
+measure_distance_3 <- function(a, data) {
+  diff <- data$y - model3(a, data)
+  sqrt(mean(diff^2))
+}
+
+best3a <- optim(c(0, 0, 0), measure_distance_3, data = sim1)
+best3a$par
+
+best3b <- optim(c(0, 0, 1), measure_distance_3, data = sim1)
+best3b$par
+
+best3c <- optim(c(0, 0, 5), measure_distance_3, data = sim1)
+best3c$par
+```
+```{r}
+grid <- sim1 %>% 
+  data_grid(x)
+
+grid <- grid %>% 
+  add_predictions(sim1_mod)
+
+ggplot(sim1, aes(x)) +
+  geom_point(aes(y = y)) +
+  geom_line(aes(y = pred), data = grid, colour = "red", size = 1)
+
+sim1 <- sim1 %>% 
+  add_residuals(sim1_mod)
+
+ggplot(sim1, aes(resid)) +
+  geom_freqpoly(binwidth = .5)
+
+ggplot(sim1, aes(x, resid)) +
+  geom_ref_line(h = 0) +
+  geom_point()
+
+sim1_loess <- loess(y ~ x, data = sim1)
+sim1_lm <- lm(y ~ x, data = sim1)
+
+grid_loess <- sim1 %>%
+  add_predictions(sim1_loess)
+
+sim1 <- sim1 %>%
+  add_residuals(sim1_lm) %>%
+  add_predictions(sim1_lm) %>%
+  add_residuals(sim1_loess, var = "resid_loess") %>%
+  add_predictions(sim1_loess, var = "pred_loess")
+
+plot_sim1_loess <-
+  ggplot(sim1, aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(x = x, y = pred), data = grid_loess, colour = "red")
+plot_sim1_loess
+
+plot_sim1_loess +
+  geom_smooth(method = "loess", colour = "blue", se = FALSE, alpha = 0.20)
+
+ggplot(sim1, aes(x = x)) +
+  geom_ref_line(h = 0) +
+  geom_point(aes(y = resid)) +
+  geom_point(aes(y = resid_loess), colour = "red")
+
+sim1_mod <- lm(y ~ x, data = sim1)
+grid <- sim1 %>%
+  data_grid(x)
+
+grid %>%
+  add_predictions(sim1_mod, var = "pred_lm") %>%
+  add_predictions(sim1_loess, var = "pred_loess")
+
+grid %>%
+  gather_predictions(sim1_mod, sim1_loess)
+
+grid %>%
+  spread_predictions(sim1_mod, sim1_loess)
+
+sim1_mod <- lm(y ~ x, data = sim1)
+
+sim1 <- sim1 %>%
+  add_residuals(sim1_mod)
+
+ggplot(sim1, aes(x = abs(resid))) +
+  geom_freqpoly(binwidth = 0.5)
+```
+
+```{r}
+df <- tribble(
+  ~y, ~x1, ~x2,
+  4, 2, 5,
+  5, 1, 6
+)
+
+model_matrix(df, y ~ x1)
+
+model_matrix(df, y ~ x1 -1)
+
+model_matrix(df, y ~ x1 + x2)
+
+df <- tribble(
+  ~ sex, ~ response,
+  "male", 1,
+  "female", 2,
+  "male", 1
+)
+
+model_matrix(df, response ~ sex)
+
+ggplot(sim2) +
+  geom_point(aes(x, y))
+
+mod2 <- lm(y ~ x, data = sim2)
+
+grid <- sim2 %>% 
+  data_grid(x) %>% 
+  add_predictions(mod2)
+
+ggplot(sim2, aes(x)) +
+  geom_point(aes(y = y)) +
+  geom_point(data = grid, aes(y = pred), colour = "red", size = 4)
+
+ggplot(sim3, aes(x1, y)) +
+  geom_point(aes(colour = x2))
+
+mod1 <- lm(y ~ x1 + x2, data = sim3)
+mod2 <- lm(y ~ x1 * x2, data = sim3)
+
+
+grid <- sim3 %>% 
+  data_grid(x1, x2) %>% 
+  gather_predictions(mod1, mod2)
+
+ggplot(sim3, aes(x1, y, colour = x2)) +
+  geom_point() +
+  geom_line(data = grid, aes(y = pred)) +
+  facet_wrap(~ model)
+
+sim3 <-  sim3 %>% 
+  gather_residuals(mod1, mod2)
+
+ggplot(sim3, aes(x1, resid, colour = x2)) +
+  geom_point() +
+  facet_grid(model ~ x2)
+
+mod1 <- lm(y ~ x1 + x2, data = sim4)
+mod2 <- lm(y ~ x1 * x2, data = sim4)
+
+grid <- sim4 %>% 
+  data_grid(
+    x1 = seq_range(x1, 5),
+    x2 = seq_range(x2, 5)
+  ) %>% 
+  gather_predictions(mod1, mod2)
+
+ggplot(grid, aes(x1, x2)) +
+  geom_tile(aes(fill = pred)) +
+  facet_wrap(~ model)
+
+ggplot(grid, aes(x1, pred, colour = x2, group = x2)) +
+  geom_line() +
+  facet_wrap(~ model)
+
+ggplot(grid, aes(x2, pred, colour = x1, group = x1)) +
+  geom_line() +
+  facet_wrap(~ model)
+
+df <- tribble(
+  ~y, ~x,
+  1, 1,
+  2, 2,
+  3, 3
+)
+
+model_matrix(df, y ~ x^2 + x)
+model_matrix(df, y ~ I(x^2) + x)
+model_matrix(df, y ~ poly(x, 2))
+
+library(splines)
+model_matrix(df, y ~ ns(x, 2))
+
+sim5 <- tibble(
+  x = seq(0, 3.5 * pi, length = 50),
+  y = 4 * sin(x) + rnorm(length(x))
+)
+
+ggplot(sim5, aes(x, y)) +
+  geom_point()
+
+mod1 <- lm(y ~ ns(x, 1), data = sim5)
+mod2 <- lm(y ~ ns(x, 2), data = sim5)
+mod3 <- lm(y ~ ns(x, 3), data = sim5)
+mod4 <- lm(y ~ ns(x, 4), data = sim5)
+mod5 <- lm(y ~ ns(x, 5), data = sim5)
+
+grid <- sim5 %>% 
+  data_grid(x = seq_range(x, n = 50, expand = .1)) %>% 
+  gather_predictions(mod1, mod2, mod3, mod4, mod5, .pred = "y")
+
+ggplot(sim5, aes(x, y)) +
+  geom_point() +
+  geom_line(data = grid, colour = "red") +
+  facet_wrap(~ model)
+
+mod2a <- lm(y ~ x - 1, data = sim2)
+mod2 <- lm(y ~ x, data = sim2)
+
+grid <- sim2 %>%
+  data_grid(x) %>%
+  spread_predictions(mod2, mod2a)
+
+x3 <- model_matrix(y ~ x1 * x2, data = sim3)
+
+all(x3[["x1:x2b"]] == (x3[["x1"]] * x3[["x2b"]]))
+all(x3[["x1:x2c"]] == (x3[["x1"]] * x3[["x2c"]]))
+all(x3[["x1:x2d"]] == (x3[["x1"]] * x3[["x2d"]]))
+
+x4 <- model_matrix(y ~ x1 * x2, data = sim4)
+
+all(x4[["x1"]] * x4[["x2"]] == x4[["x1:x2"]])
+
+mod1 <- lm(y ~ x1 + x2, data = sim3)
+mod2 <- lm(y ~ x1 * x2, data = sim3)
+
+levels(sim3$x2)
+
+model_matrix_mod1 <- function(.data) {
+  mutate(.data,
+    x2b = as.numeric(x2 == "b"),
+    x2c = as.numeric(x2 == "c"),
+    x2d = as.numeric(x2 == "d"),
+    `(Intercept)` = 1
+  ) %>%
+    select(`(Intercept)`, x1, x2b, x2c, x2d)
+}
+
+model_matrix_mod1(sim3)
+
+model_matrix_mod1b <- function(.data) {
+  # the levels of x2
+  lvls <- levels(.data$x2)
+  # drop the first level
+  # this assumes that there are at least two levels
+  lvls <- lvls[2:length(lvls)]
+  # create an indicator variable for each level of x2
+  for (lvl in lvls) {
+    # new column name x2 + level name
+    varname <- str_c("x2", lvl)
+    # add indicator variable for lvl
+    .data[[varname]] <- as.numeric(.data$x2 == lvl)
+  }
+  # generate the list of variables to keep
+  x2_variables <- str_c("x2", lvls)
+  # Add an intercept
+  .data[["(Intercept)"]] <- 1
+  # keep x1 and x2 indicator variables
+  select(.data, `(Intercept)`, x1, all_of(x2_variables))
+}
+
+model_matrix_mod1b(sim3)
+
+model_matrix_mod2 <- function(.data) {
+  mutate(.data,
+    `(Intercept)` = 1,
+    x2b = as.numeric(x2 == "b"),
+    x2c = as.numeric(x2 == "c"),
+    x2d = as.numeric(x2 == "d"),
+    `x1:x2b` = x1 * x2b,
+    `x1:x2c` = x1 * x2c,
+    `x1:x2d` = x1 * x2d
+  ) %>%
+    select(`(Intercept)`, x1, x2b, x2c, x2d, `x1:x2b`, `x1:x2c`, `x1:x2d`)
+}
+
+model_matrix_mod2(sim3)
+
+model_matrix_mod2b <- function(.data) {
+  # get dataset with x1 and x2 indicator variables
+  out <- model_matrix_mod1b(.data)
+  # get names of the x2 indicator columns
+  x2cols <- str_subset(colnames(out), "^x2")
+  # create interactions between x1 and the x2 indicator columns
+  for (varname in x2cols) {
+    # name of the interaction variable
+    newvar <- str_c("x1:", varname)
+    out[[newvar]] <- out$x1 * out[[varname]]
+  }
+  out
+}
+
+model_matrix_mod2b(sim3)
+
+mod1 <- lm(y ~ x1 + x2, data = sim4)
+mod2 <- lm(y ~ x1 * x2, data = sim4)
+
+sim4_mods <- gather_residuals(sim4, mod1, mod2)
+
+ggplot(sim4_mods, aes(x = resid, colour = model)) +
+  geom_freqpoly(binwidth = 0.5) +
+  geom_rug()
+
+ggplot(sim4_mods, aes(x = abs(resid), colour = model)) +
+  geom_freqpoly(binwidth = 0.5) +
+  geom_rug()
+
+sim4_mods %>%
+  group_by(model) %>%
+  summarise(resid = sd(resid))
+
+```
+```{r}
+df <- tribble(
+  ~x, ~y,
+  1, 2.2,
+  2, NA,
+  3, 3.5,
+  4, 8.3,
+  NA, 10
+)
+
+mod <- lm(y ~ x, data = df, na.action = na.exclude)
+nobs(mod)
+
+
+```
+
+```{r}
+library(nycflights13)
+library(lubridate)
+
+ggplot(diamonds, aes(carat, price)) +
+  geom_hex(bins = 50)
+
+diamonds2 <- diamonds %>% 
+  filter(carat <= 2.5) %>% 
+  mutate(lprice = log2(price), lcarat = log2(carat))
+
+mod_diamonds <- lm(lprice ~ lcarat, data = diamonds2)
+
+grid <- diamonds2 %>% 
+  data_grid(carat = seq_range(carat, 20)) %>% 
+  mutate(lcarat = log2(carat)) %>% 
+  add_predictions(mod_diamonds, "lprice") %>% 
+  mutate(price = 2 ^ lprice)
+
+view(grid)
+
+ggplot(diamonds2, aes(carat, price)) +
+  geom_hex(bins = 50) +
+  geom_line(data = grid, colour = "red", size = 1)
+
+diamonds2 <- diamonds2 %>% 
+  add_residuals(mod_diamonds, "lresid")
+
+ggplot(diamonds2, aes(lcarat, lresid)) +
+  geom_hex(bins = 50)
+
+ggplot(diamonds2, aes(cut, lresid)) + geom_boxplot()
+ggplot(diamonds2, aes(color, lresid)) + geom_boxplot()
+ggplot(diamonds2, aes(clarity, lresid)) + geom_boxplot()
+
+mod_diamonds2 <- lm(lprice ~ lcarat + color + cut + clarity, data = diamonds2)
+
+grid <- diamonds2 %>% 
+  data_grid(cut, .model = mod_diamonds2) %>% 
+  add_predictions(mod_diamonds2)
+
+grid
+
+ggplot(grid, aes(cut, pred)) +
+  geom_point()
+
+diamonds2 <- diamonds2 %>% 
+  add_residuals(mod_diamonds2, "lresid2")
+
+ggplot(diamonds2, aes(lcarat, lresid2)) +
+  geom_hex(bins = 50)
+
+diamonds2 %>% 
+  filter(abs(lresid2) > 1) %>% 
+  add_predictions(mod_diamonds2) %>% 
+  mutate(pred = round(2 ^ pred)) %>% 
+  select(price, pred, carat:table, x:z) %>% 
+  arrange(price)
+
+mod_log <- lm(log2(price) ~ log2(carat), data = diamonds)
+mod_log
+
+tibble(carat = seq(0.25, 5, by = 0.25)) %>%
+  add_predictions(mod_log) %>%
+  ggplot(aes(x = carat, y = 2^pred)) +
+  geom_line() +
+  labs(x = "carat", y = "price")
+
+2^coef(mod_log)[2]
+
+2^(predict(mod_log, newdata = tibble(carat = 2)) -
+  predict(mod_log, newdata = tibble(carat = 1)))
+
+2^(predict(mod_log, newdata = tibble(carat = 4)) -
+  predict(mod_log, newdata = tibble(carat = 2)))
+
+2^(predict(mod_log, newdata = tibble(carat = 1)) -
+  predict(mod_log, newdata = tibble(carat = 0.5)))
+
+lresid2_summary <- summarise(diamonds2,
+  rmse = sqrt(mean(lresid2^2)),
+  mae = mean(abs(lresid2)),
+  p025 = quantile(lresid2, 0.025),
+  p975 = quantile(lresid2, 0.975)
+)
+lresid2_summary
+```
+```{r}
+daily <- flights %>% 
+  mutate(date = make_date(year, month, day)) %>% 
+  group_by(date) %>%
+  summarise(n = n())
+
+ggplot(daily, aes(date, n)) +
+  geom_line()
+
+daily <- daily %>% 
+  mutate(wday = wday(date, label = TRUE))
+
+ggplot(daily, aes(wday, n)) +
+  geom_boxplot()
+
+mod <- lm(n ~ wday, data = daily)
+
+grid <- daily %>% 
+  data_grid(wday) %>% 
+  add_predictions(mod, "n")
+
+ggplot(daily, aes(wday, n)) +
+  geom_boxplot() +
+  geom_point(data = grid, colour = "red", size = 4)
+
+daily <- daily %>% 
+  add_residuals(mod)
+
+daily %>% 
+  ggplot(aes(date, resid)) +
+  geom_ref_line(h = 0) +
+  geom_line()
+
+ggplot(daily, aes(date, resid, colour = wday)) +
+  geom_ref_line(h = 0) +
+  geom_line()
+
+daily %>% 
+  filter(resid < -100)
+
+daily %>% 
+  ggplot(aes(date, resid)) +
+  geom_ref_line(h = 0) +
+  geom_line(colour = "grey50") +
+  geom_smooth(se = FALSE, span = .2)
+
+daily %>% 
+  filter(wday == "za") %>% 
+  ggplot(aes(date, n)) +
+    geom_point() +
+    geom_line() +
+    scale_x_date(NULL, date_breaks = "1 month", date_labels = "%b")
+
+term <- function(date) {
+  cut(date,
+      breaks = ymd(20130101, 20130605, 20130825, 20140101),
+      labels = c("spring", "summer", "fall")
+  )
+      
+}
+
+daily <- daily %>% 
+ mutate(term = term(date))
+
+daily %>% 
+  filter(wday == "za") %>%
+  ggplot(aes(date, n, colour = term)) +
+  geom_point(alpha = 1/3) +
+  geom_line() +
+  scale_x_date(NULL, date_breaks = "1 month", date_labels = "%b")
+
+daily %>% 
+  ggplot(aes(wday, n, colour = term)) +
+    geom_boxplot()
+
+mod1 <- lm(n ~ wday, data = daily)
+mod2 <- lm(n ~ wday * term, data = daily)
+
+daily %>% 
+  gather_residuals(without_term = mod1, with_term = mod2) %>% 
+  ggplot(aes(date, resid, colour = model)) +
+    geom_line(alpha = .5)
+
+grid <- daily %>% 
+  data_grid(wday, term) %>% 
+  add_predictions(mod2, "n")
+
+ggplot(daily, aes(wday, n)) +
+  geom_boxplot() +
+  geom_point(data = grid, colour = "red") +
+  facet_wrap(~ term)
+
+library(MASS)
+mod3 <- MASS::rlm(n ~ wday * term, data = daily)
+
+daily %>% 
+  add_residuals(mod3, "resid") %>% 
+  ggplot(aes(date, resid)) +
+  geom_hline(yintercept = 0, size = 2, colour = "white") +
+  geom_line()
+
+compute_vars <- function(data) {
+  data %>% 
+    mutate(
+      term = term(date),
+      wday = wday(date, label = TRUE)
+    )
+}
+
+wday2 <- function(x) {
+  wday(x, label = TRUE)
+}
+
+mod3 <- lm(n ~ wday2(date) * term(date), data = daily)
+
+library(splines)
+
+mod <- MASS::rlm(n ~ wday * ns(date, 5), data = daily)
+
+daily %>% 
+  data_grid(wday, date = seq_range(date, n = 13)) %>% 
+  add_predictions(mod) %>% 
+  ggplot(aes(date, pred, colour = wday)) +
+    geom_line() +
+    geom_point()
+
+top_n(daily, 3, resid)
+
+daily <- daily %>%
+  mutate(
+    wday2 =
+      case_when(
+        wday == "za" & term == "summer" ~ "Sat-summer",
+        wday == "za" & term == "fall" ~ "Sat-fall",
+        wday == "za" & term == "spring" ~ "Sat-spring",
+        TRUE ~ as.character(wday)
+      )
+  )
+
+mod3 <- lm(n ~ wday2, data = daily)
+
+daily %>%
+  gather_residuals(sat_term = mod3, all_interact = mod2) %>%
+  ggplot(aes(date, resid, colour = model)) +
+  geom_line(alpha = 0.75)
+
+daily %>%
+  spread_residuals(sat_term = mod3, all_interact = mod2) %>%
+  mutate(resid_diff = sat_term - all_interact) %>%
+  ggplot(aes(date, resid_diff)) +
+  geom_line(alpha = 0.75)
+
+library(broom)
+glance(mod3) %>% dplyr::select(r.squared, sigma, AIC, df)
+glance(mod2) %>% dplyr::select(r.squared, sigma, AIC, df)
+
+holidays_2013 <-
+  tribble(
+    ~holiday, ~date,
+    "New Year's Day", 20130101,
+    "Martin Luther King Jr. Day", 20130121,
+    "Washington's Birthday", 20130218,
+    "Memorial Day", 20130527,
+    "Independence Day", 20130704,
+    "Labor Day", 20130902,
+    "Columbus Day", 20131028,
+    "Veteran's Day", 20131111,
+    "Thanksgiving", 20131128,
+    "Christmas", 20131225
+  ) %>%
+  mutate(date = lubridate::ymd(date))
+
+daily <- daily %>%
+  mutate(
+    wday3 =
+      case_when(
+        date %in% (holidays_2013$date - 1L) ~ "day before holiday",
+        date %in% (holidays_2013$date + 1L) ~ "day after holiday",
+        date %in% holidays_2013$date ~ "holiday",
+        .$wday == "za" & .$term == "summer" ~ "Sat-summer",
+        .$wday == "za" & .$term == "fall" ~ "Sat-fall",
+        .$wday == "zat" & .$term == "spring" ~ "Sat-spring",
+        TRUE ~ as.character(.$wday)
+      )
+  )
+
+mod4 <- lm(n ~ wday3, data = daily)
+
+daily %>%
+  spread_residuals(resid_sat_terms = mod3, resid_holidays = mod4) %>%
+  mutate(resid_diff = resid_holidays - resid_sat_terms) %>%
+  ggplot(aes(date, resid_diff)) +
+  geom_line(alpha = 0.75)
+
+
+daily <- mutate(daily, month = factor(lubridate::month(date)))
+mod6 <- lm(n ~ wday * month, data = daily)
+print(summary(mod6))
+
+mod7 <- lm(n ~ wday + ns(date, 5), data = daily)
+mod8 <- lm(n ~ wday * ns(date, 5), data = daily)
+
+daily %>%
+  gather_residuals(mod7, mod8) %>%
+  ggplot(aes(x = date, y = resid, color = model)) +
+  geom_line(alpha = 0.75)
+
+flights %>%
+  mutate(
+    date = make_date(year, month, day),
+    wday = wday(date, label = TRUE)
+  ) %>%
+  ggplot(aes(y = distance, x = wday)) +
+  geom_boxplot() +
+  labs(x = "Day of Week", y = "Average Distance")
+
+
+flights %>%
+  mutate(
+    date = make_date(year, month, day),
+    wday = wday(date, label = TRUE)
+  ) %>%
+  ggplot(aes(y = distance, x = wday)) +
+  geom_boxplot(outlier.shape = NA) +
+  labs(x = "Day of Week", y = "Average Distance")
+
+flights %>%
+  mutate(
+    date = make_date(year, month, day),
+    wday = wday(date, label = TRUE)
+  ) %>%
+  ggplot(aes(y = distance, x = wday)) +
+  stat_summary() +
+  labs(x = "Day of Week", y = "Average Distance")
+
+flights %>%
+  mutate(
+    date = make_date(year, month, day),
+    wday = wday(date, label = TRUE)
+  ) %>%
+  ggplot(aes(y = distance, x = wday)) +
+  geom_violin() +
+  labs(x = "Day of Week", y = "Average Distance")
+
+flights %>%
+  mutate(
+    date = make_date(year, month, day),
+    wday = wday(date, label = TRUE)
+  ) %>%
+  filter(
+    distance < 3000,
+    hour >= 5, hour <= 21
+  ) %>%
+  ggplot(aes(x = hour, color = wday, y = ..density..)) +
+  geom_freqpoly(binwidth = 1)
+
+flights %>%
+  mutate(
+    date = make_date(year, month, day),
+    wday = wday(date, label = TRUE)
+  ) %>%
+  filter(
+    distance < 3000,
+    hour >= 5, hour <= 21
+  ) %>%
+  group_by(wday, hour) %>%
+  summarise(distance = mean(distance)) %>%
+  ggplot(aes(x = hour, color = wday, y = distance)) +
+  geom_line()
+
+flights %>%
+  mutate(
+    date = make_date(year, month, day),
+    wday = wday(date, label = TRUE)
+  ) %>%
+  filter(
+    distance < 3000,
+    hour >= 5, hour <= 21
+  ) %>%
+  group_by(wday, hour) %>%
+  summarise(distance = sum(distance)) %>%
+  group_by(wday) %>%
+  mutate(prop_distance = distance / sum(distance)) %>%
+  ungroup() %>%
+  ggplot(aes(x = hour, color = wday, y = prop_distance)) +
+  geom_line()
+
+monday_first <- function(x) {
+  fct_relevel(x, levels(x)[-1])
+}
+
+daily <- daily %>%
+  mutate(wday = wday(date, label = TRUE))
+ggplot(daily, aes(monday_first(wday), n)) +
+  geom_boxplot() +
+  labs(x = "Day of Week", y = "Number of flights")
+```
+```{r}
+library(gapminder)
+  
+gapminder %>% 
+  ggplot(aes(year, lifeExp)) +
+    geom_line(aes(group = country), alpha = 1/3) +
+    geom_smooth(se = FALSE)
+
+nz <- filter(gapminder, country == "New Zealand")
+
+nz %>% 
+  ggplot(aes(year, lifeExp)) +
+  geom_line() +
+  ggtitle("Full data =")
+
+nz_mod <- lm(lifeExp ~ year, data = nz)
+
+nz %>% 
+  add_predictions(nz_mod) %>% 
+  ggplot(aes(year, pred)) +
+  geom_line() +
+  ggtitle("Linear trend + ")
+
+nz %>% 
+  add_residuals(nz_mod) %>% 
+  ggplot(aes(year, resid)) +
+  geom_hline(yintercept = 0, colour = "white", size = 3) +
+  geom_line() +
+  ggtitle("Remaining pattern")
+
+by_country <- gapminder %>% 
+  group_by(country, continent) %>% 
+  nest()
+
+by_country$data[[1]]
+
+country_model <- function(df) {
+  lm(lifeExp ~ year, data = df)
+}
+
+models <- map(by_country$data, country_model)
+
+by_country <- by_country %>% 
+  mutate(model = map(data, country_model))
+
+by_country <- by_country %>% 
+  mutate(
+    resids = map2(data, model, add_residuals)
+  )
+
+resids <- unnest(by_country, resids)
+
+resids %>% 
+  ggplot(aes(year, resid)) +
+    geom_line(aes(group = country), alpha = 1/3) +
+    geom_smooth(se = FALSE)
+
+resids %>% 
+  ggplot(aes(year, resid, group = country)) +
+  geom_line(alpha = 1/3) +
+  facet_wrap(~continent)
+
+broom::glance(nz_mod)
+
+glance <- by_country %>% 
+  mutate(glance = map(model, broom::glance)) %>% 
+  unnest(glance, .drop = TRUE)
+
+glance %>% arrange(r.squared)
+
+glance %>% 
+  ggplot(aes(continent, r.squared)) +
+    geom_jitter(width = .5)
+
+bad_fit <- filter(glance, r.squared < .25)
+
+gapminder %>% 
+  semi_join(bad_fit, by = "country") %>% 
+  ggplot(aes(year, lifeExp, colour = country)) +
+    geom_line()
+
+lifeExp ~ poly(year, 2)
+
+country_model <- function(df) {
+  lm(lifeExp ~ poly(year - median(year), 2), data = df)
+}
+
+by_country <- gapminder %>%
+  group_by(country, continent) %>%
+  nest()
+
+by_country <- by_country %>%
+  mutate(model = map(data, country_model))
+
+by_country <- by_country %>%
+  mutate(
+    resids = map2(data, model, add_residuals)
+  )
+by_country
+
+unnest(by_country, resids) %>%
+  ggplot(aes(year, resid)) +
+  geom_line(aes(group = country), alpha = 1 / 3) +
+  geom_smooth(se = FALSE)
+
+by_country %>%
+  mutate(glance = map(model, broom::glance)) %>%
+  unnest(glance, .drop = TRUE) %>%
+  ggplot(aes(continent, r.squared)) +
+  geom_jitter(width = 0.5)
+
+library("ggbeeswarm")
+by_country %>%
+  mutate(glance = map(model, broom::glance)) %>%
+  unnest(glance, .drop = TRUE) %>%
+  ggplot(aes(continent, r.squared)) +
+  geom_beeswarm()
+
+gapminder %>%
+  group_by(country, continent) %>%
+  nest() %>%
+  mutate(model = map(data, ~lm(lifeExp ~ year, .))) %>%
+  mutate(glance = map(model, broom::glance)) %>%
+  unnest(glance) %>%
+  unnest(data) %>%
+  filter(r.squared < 0.25) %>%
+  ggplot(aes(year, lifeExp)) +
+  geom_line(aes(color = country))
+```
+
+```{r}
+tribble(
+  ~x, ~y,
+  1:3, "1, 2",
+  3:5, "3, 4, 5"
+)
+
+gapminder %>% 
+  nest(year:gdpPercap)
+
+df <- tribble(
+  ~x1,
+  "a, b, c",
+  "d, e, f, g"
+)
+
+df %>% 
+  mutate(x2 = stringr::str_split(x1, ", "))
+
+df %>% 
+  mutate(x2 = stringr:: str_split(x1, ", ")) %>% 
+  unnest()
+
+sim <- tribble(
+  ~f, ~params,
+  "runif", list(min = -1, max = 1),
+  "rnorm", list(sd = 5),
+  "rpois", list(lambda = 10)
+)
+
+sim %>% 
+  mutate(sims = invoke_map(f, params, n = 10))
+
+mtcars %>% 
+  group_by(cyl) %>% 
+  summarise(q = list(quantile(mpg)))
+
+probs <- c(.01, .25, .5, .75, .99)
+
+mtcars %>% 
+  group_by(cyl) %>% 
+  summarise(p = list(probs), q = list(quantile(mpg, probs))) %>% 
+  unnest()
+
+x <- list(
+  a = 1:5,
+  b = 3:4,
+  c = 5:6
+)
+
+df <- enframe(x)
+
+df %>% 
+  mutate(
+    smry = map2_chr(name, value, ~ stringr::str_c(.x, ": ", mean(.y)))
+  )
+
+str_split(sentences[1:3], " ")
+str_match_all(c("abc", "aa", "aabaa", "abbbc"), "a+")
+map(1:3, runif)
+
+
+range(mtcars$mpg)
+fivenum(mtcars$mpg)
+boxplot.stats(mtcars$mpg)
+
+mtcars %>%
+  group_by(cyl) %>%
+  summarise(q = list(quantile(mpg))) %>%
+  unnest()
+
+quantile(mtcars$mpg)
+
+mtcars %>%
+  group_by(cyl) %>%
+  summarise_each(funs(list))
+
+df <- tribble(
+  ~x,
+  letters[1:5],
+  1:3,
+  runif(5)
+)
+
+df %>% mutate(
+  type = map_chr(x, typeof),
+  length = map_int(x, length)
+)
+
+df <- tribble(
+  ~x,
+  list(a = 1, b = 2),
+  list(a = 2, c = 4)
+)
+
+df %>% mutate(
+  a = map_dbl(x, "a"),
+  b = map_dbl(x, "b", .null = NA_real_),
+  c = map_dbl(x, "c", .null = NA_real_)
+)
+
+tibble(x = 1:2, y = list(1:4, 1)) %>% unnest(y)
+
+#?lengths
+```
